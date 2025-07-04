@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoAlert - Custom Earthquake Evacuation System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #e74c3c;
+            --primary-dark: #c0392b;
+            --safe: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --grey: #95a5a6;
+            --blue: #3498db;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+            color: var(--light);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: rgba(44, 62, 80, 0.95);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateY(0);
+            transition: var(--transition);
+        }
+
+        .container.earthquake-active {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            10%,
+            30%,
+            50%,
+            70%,
+            90% {
+                transform: translateX(-5px);
+            }
+
+            20%,
+            40%,
+            60%,
+            80% {
+                transform: translateX(5px);
+            }
+        }
+
+        /* Header Styles */
+        header {
+            background: linear-gradient(to right, var(--dark), #1a2a6c);
+            padding: 25px 20px 20px;
+            text-align: center;
+            border-bottom: 3px solid var(--primary);
+            position: relative;
+            box-shadow: var(--shadow);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .logo-icon {
+            font-size: 2.8rem;
+            color: var(--primary);
+            text-shadow: 0 0 15px rgba(231, 76, 60, 0.7);
+        }
+
+        .logo-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .app-version {
+            font-size: 0.9rem;
+            color: var(--grey);
+            margin-top: 5px;
+        }
+
+        .connection-status {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-dot.connected {
+            background: var(--safe);
+            box-shadow: 0 0 8px var(--safe);
+        }
+
+        .status-dot.disconnected {
+            background: var(--grey);
+        }
+
+        /* Navigation */
+        nav {
+            display: flex;
+            justify-content: center;
+            background: rgba(52, 73, 94, 0.9);
+            padding: 12px;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-btn {
+            background: rgba(44, 62, 80, 0.7);
+            border: none;
+            padding: 12px 18px;
+            border-radius: 30px;
+            color: var(--light);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .nav-btn:hover,
+        .nav-btn.active {
+            background: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        /* Screen Styles */
+        .screen {
+            display: none;
+            padding: 25px 20px;
+            min-height: 500px;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .screen-title {
+            font-size: 1.7rem;
+            margin-bottom: 25px;
+            color: var(--light);
+            text-align: center;
+            position: relative;
+            padding-bottom: 15px;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .screen-title:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        /* Dashboard */
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: rgba(52, 73, 94, 0.7);
+            border-radius: 15px;
+            padding: 20px 15px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-card:hover {
+            transform: translateY(-7px);
+            border-color: var(--primary);
+        }
+
+        .card-icon {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            color: var(--grey);
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 10px 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .card-value.safe {
+            color: var(--safe);
+        }
+
+        .card-value.warning {
+            color: var(--warning);
+        }
+
+        .card-value.danger {
+            color: var(--danger);
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--grey);
+        }
+
+        .earthquake-status {
+            background: rgba(41, 128, 185, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 25px;
+            border: 2px solid var(--blue);
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.3);
+        }
+
+        .status-message {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--safe);
+            text-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+        }
+
+        .status-submessage {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: var(--light);
+        }
+
+        .btn {
+            padding: 16px 25px;
+            border-radius: 50px;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            margin: 10px auto;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .btn-test {
+            background: linear-gradient(to right, #9b59b6, #8e44ad);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Map Screen */
+        #map-container {
+            height: 300px;
+            border-radius: 15px;
+            margin: 20px 0 30px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow);
+            background: #34495e;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .map-overlay h3 {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: var(--safe);
+        }
+
+        .map-overlay p {
+            font-size: 1.2rem;
+            max-width: 80%;
+            line-height: 1.6;
+        }
+
+        .seismic-activity {
+            background: rgba(44, 62, 80, 0.8);
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .activity-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--light);
+        }
+
+        .activity-list {
+            list-style: none;
+        }
+
+        .activity-item {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .activity-location {
+            font-weight: 600;
+        }
+
+        .activity-magnitude {
+            font-weight: 700;
+            color: var(--warning);
+        }
+
+        /* Evacuation info */
+        .evacuation-info {
+            background: rgba(46, 204, 113, 0.15);
+            border: 2px solid var(--safe);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .info-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.4rem;
+            color: var(--safe);
+            margin-bottom: 15px;
+        }
+
+        .route-details {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px 15px;
+            margin-top: 15px;
+        }
+
+        .route-label {
+            font-weight: 600;
+            color: var(--light);
+        }
+
+        .route-value {
+            color: var(--light);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark);
+            padding: 18px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--grey);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .status-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-btn span {
+                display: none;
+            }
+
+            .nav-btn {
+                padding: 14px;
+                border-radius: 50%;
+                font-size: 1.2rem;
+            }
+
+            .btn {
+                padding: 14px;
+                font-size: 1rem;
+            }
+        }
+
+        /* Animation for earthquake */
+        @keyframes vibrate {
+            0% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-3px);
+            }
+
+            50% {
+                transform: translateX(3px);
+            }
+
+            75% {
+                transform: translateX(-3px);
+            }
+
+            100% {
+                transform: translateX(0);
+            }
+        }
+
+        .vibrate {
+            animation: vibrate 0.1s infinite;
+        }
+
+        /* Pulsing effect for alerts */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(231, 76, 60, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+            }
+        }
+
+        .pulse-alert {
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Safe status animation */
+        @keyframes safePulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 12px rgba(46, 204, 113, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+            }
+        }
+
+        .safe-pulse {
+            animation: safePulse 2s infinite;
+        }
+
+        /* Custom map controls */
+        .leaflet-control {
+            background: rgba(44, 62, 80, 0.9);
+            border-radius: 5px;
+            color: white;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+
+        .leaflet-control-attribution {
+            background: rgba(44, 62, 80, 0.7) !important;
+            color: var(--light) !important;
+            font-size: 11px;
+        }
+
+        .leaflet-bar a {
+            background-color: rgba(44, 62, 80, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .leaflet-bar a:hover {
+            background-color: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" id="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-earth-asia logo-icon"></i>
+                <div class="logo-text">SeismSense</div>
+            </div>
+            <div class="app-version">Earthquake Evacuation System v4.0</div>
+
+            <div class="connection-status">
+                <div class="status-indicator">
+                    <div class="status-dot connected"></div>
+                    <span>Sensor Connected</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot connected"></div>
+                    <span>GPS Active</span>
+                </div>
+            </div>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" data-screen="dashboard">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-btn" data-screen="map">
+                <i class="fas fa-map-marked-alt"></i>
+                <span>Evacuation</span>
+            </button>
+            <button class="nav-btn" data-screen="alerts">
+                <i class="fas fa-bell"></i>
+                <span>Alerts</span>
+            </button>
+            <button class="nav-btn" data-screen="settings">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </button>
+        </nav>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard" class="screen active">
+            <h2 class="screen-title">System Dashboard</h2>
+
+            <div class="status-cards">
+                <div class="status-card">
+                    <i class="fas fa-shield-alt card-icon"></i>
+                    <div class="card-title">System Status</div>
+                    <div class="card-value safe">Active</div>
+                    <div class="card-desc">Monitoring vibrations</div>
+                </div>
+
+                <div class="status-card">
+                    <i class="fas fa-battery-three-quarters card-icon"></i>
+                    <div class="card-title">Sensor Battery</div>
+                    <div class="card-value warning">78%</div>
+                    <div class="card-desc">24h estimated</div>
+                </div>
+
+                <div class="status-card">
+                    <i class="fas fa-satellite card-icon"></i>
+                    <div class="card-title">Connection</div>
+                    <div class="card-value safe">Stable</div>
+                    <div class="card-desc">Bluetooth 5.2</div>
+                </div>
+
+                <div class="status-card">
+                    <i class="fas fa-vibration card-icon"></i>
+                    <div class="card-title">Sensitivity</div>
+                    <div class="card-value">6.5</div>
+                    <div class="card-desc">Moderate</div>
+                </div>
+            </div>
+
+            <div class="earthquake-status safe-pulse">
+                <div class="status-message">NO EARTHQUAKE DETECTED</div>
+                <div class="status-submessage">All systems normal</div>
+                <p>No seismic activity in your area</p>
+            </div>
+
+            <button id="testAlertBtn" class="btn btn-test">
+                <i class="fas fa-bolt"></i> Simulate Earthquake Detection
+            </button>
+        </div>
+
+        <!-- Map Screen -->
+        <div id="map" class="screen">
+            <h2 class="screen-title">Evacuation Route</h2>
+
+            <div id="map-container">
+                <div id="map"></div>
+                <div class="map-overlay" id="map-overlay">
+                    <h3>No Active Alert</h3>
+                    <p>Evacuation routes will appear here during an earthquake</p>
+                    <div style="margin-top: 20px; font-size: 5rem; color: var(--safe);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="evacuation-info" id="evac-info">
+                <div class="info-title">
+                    <i class="fas fa-route"></i>
+                    <h3>Evacuation Route Details</h3>
+                </div>
+                <p>Follow the highlighted route on the map to reach the nearest safe zone</p>
+
+                <div class="route-details">
+                    <div class="route-label">Destination:</div>
+                    <div class="route-value" id="dest-value">Merdeka Square</div>
+
+                    <div class="route-label">Distance:</div>
+                    <div class="route-value" id="dist-value">1.2 km</div>
+
+                    <div class="route-label">Estimated Time:</div>
+                    <div class="route-value" id="time-value">15 minutes</div>
+
+                    <div class="route-label">Route Safety:</div>
+                    <div class="route-value" id="safety-value">High (Avoids bridges)</div>
+                </div>
+            </div>
+
+            <div class="seismic-activity">
+                <div class="activity-title">
+                    <i class="fas fa-wave-square"></i>
+                    <h3>Nearest Safe Zones</h3>
+                </div>
+                <ul class="activity-list">
+                    <li class="activity-item">
+                        <span class="activity-location">Merdeka Square</span>
+                        <span class="activity-magnitude">1.2 km</span>
+                    </li>
+                    <li class="activity-item">
+                        <span class="activity-location">KLCC Park</span>
+                        <span class="activity-magnitude">2.5 km</span>
+                    </li>
+                    <li class="activity-item">
+                        <span class="activity-location">KL Hospital Field</span>
+                        <span class="activity-magnitude">3.1 km</span>
+                    </li>
+                    <li class="activity-item">
+                        <span class="activity-location">National Stadium</span>
+                        <span class="activity-magnitude">4.7 km</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Alerts Screen -->
+        <div id="alerts" class="screen">
+            <h2 class="screen-title">Emergency Alert System</h2>
+
+            <div style="background: rgba(41, 128, 185, 0.2); border-radius: 15px; padding: 25px; margin-bottom: 25px; text-align: center;">
+                <div style="font-size: 1.2rem; margin-bottom: 15px;">
+                    <i class="fas fa-info-circle" style="color: var(--blue); margin-right: 10px;"></i>
+                    Alert system is currently <span style="color: var(--safe); font-weight: 700;">INACTIVE</span>
+                </div>
+                <p>No earthquakes detected in your area</p>
+            </div>
+
+            <div style="background: rgba(44, 62, 80, 0.8); border-radius: 15px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <i class="fas fa-sliders-h"></i> Alert Settings
+                </h3>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div>
+                        <div style="font-weight: 600;">Vibration Alerts</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">Enable haptic feedback</div>
+                    </div>
+                    <label style="display: inline-block; position: relative; width: 60px; height: 30px;">
+                        <input type="checkbox" id="vibration-toggle" checked style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #34495e; border-radius: 34px; transition: .4s;"></span>
+                        <span style="position: absolute; content: ''; height: 22px; width: 22px; left: 4px; bottom: 4px; background: white; transition: .4s; border-radius: 50%;"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div>
+                        <div style="font-weight: 600;">Alert Sound</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">Emergency siren</div>
+                    </div>
+                    <label style="display: inline-block; position: relative; width: 60px; height: 30px;">
+                        <input type="checkbox" id="sound-toggle" checked style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #34495e; border-radius: 34px; transition: .4s;"></span>
+                        <span style="position: absolute; content: ''; height: 22px; width: 22px; left: 4px; bottom: 4px; background: white; transition: .4s; border-radius: 50%;"></span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+                    <div>
+                        <div style="font-weight: 600;">Auto-Alert</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">Contact emergency services</div>
+                    </div>
+                    <label style="display: inline-block; position: relative; width: 60px; height: 30px;">
+                        <input type="checkbox" id="auto-alert-toggle" checked style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #34495e; border-radius: 34px; transition: .4s;"></span>
+                        <span style="position: absolute; content: ''; height: 22px; width: 22px; left: 4px; bottom: 4px; background: white; transition: .4s; border-radius: 50%;"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="background: rgba(44, 62, 80, 0.8); border-radius: 15px; padding: 20px;">
+                <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <i class="fas fa-user-shield"></i> Emergency Contacts
+                </h3>
+
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div>
+                        <div style="font-weight: 600;">Malaysian Emergency</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">999</div>
+                    </div>
+                    <div style="color: var(--warning);">
+                        <i class="fas fa-phone-alt"></i>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div>
+                        <div style="font-weight: 600;">Dr. Aisha Tan</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">+60 12-345 6789</div>
+                    </div>
+                    <div style="color: var(--warning);">
+                        <i class="fas fa-user-md"></i>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+                    <div>
+                        <div style="font-weight: 600;">Family Contact</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">+60 19-876 5432</div>
+                    </div>
+                    <div style="color: var(--warning);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings" class="screen">
+            <h2 class="screen-title">System Settings</h2>
+
+            <div style="background: rgba(44, 62, 80, 0.8); border-radius: 15px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <i class="fas fa-sliders-h"></i> Device Configuration
+                </h3>
+
+                <div style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="font-weight: 600;">Sensitivity Level</span>
+                        <span style="color: var(--warning);">Medium (6.5)</span>
+                    </div>
+                    <input type="range" id="sensitivity-slider" min="1" max="10" value="6.5" step="0.5" style="width: 100%; height: 10px; border-radius: 5px;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span style="font-size: 0.9rem; color: var(--grey);">Low</span>
+                        <span style="font-size: 0.9rem; color: var(--grey);">High</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <div style="font-weight: 600; margin-bottom: 10px;">Alert Volume</div>
+                    <input type="range" id="volume-slider" min="0" max="100" value="80" style="width: 100%; height: 10px; border-radius: 5px;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span style="font-size: 0.9rem; color: var(--grey);">Mute</span>
+                        <span style="font-size: 0.9rem; color: var(--grey);">Max</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 10px;">Auto-Alert Delay</div>
+                    <input type="range" id="alert-delay-slider" min="30" max="180" value="120" style="width: 100%; height: 10px; border-radius: 5px;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span style="font-size: 0.9rem; color: var(--grey);">30s</span>
+                        <span style="font-size: 0.9rem; color: var(--grey);">120s</span>
+                        <span style="font-size: 0.9rem; color: var(--grey);">180s</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: rgba(44, 62, 80, 0.8); border-radius: 15px; padding: 20px;">
+                <h3 style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <i class="fas fa-map-marked-alt"></i> Location Settings
+                </h3>
+
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <div style="font-size: 2.5rem; color: var(--blue);">
+                        <i class="fas fa-street-view"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600;">Current Location</div>
+                        <div style="font-size: 0.9rem; color: var(--grey);">Kuala Lumpur, Malaysia</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <div style="font-weight: 600; margin-bottom: 10px;">Safe Zones</div>
+                    <div style="background: rgba(52, 73, 94, 0.6); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                        <i class="fas fa-park" style="color: var(--safe); margin-right: 10px;"></i>
+                        Merdeka Square - 1.2km
+                    </div>
+                    <div style="background: rgba(52, 73, 94, 0.6); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                        <i class="fas fa-school" style="color: var(--safe); margin-right: 10px;"></i>
+                        SMK Taman Desa School - 0.8km
+                    </div>
+                    <div style="background: rgba(52, 73, 94, 0.6); border-radius: 10px; padding: 12px;">
+                        <i class="fas fa-hospital" style="color: var(--safe); margin-right: 10px;"></i>
+                        Kuala Lumpur Hospital - 2.5km
+                    </div>
+                </div>
+
+                <button style="background: var(--primary); color: white; border: none; border-radius: 30px; padding: 12px 20px; width: 100%; font-weight: 600; cursor: pointer; transition: var(--transition);">
+                    <i class="fas fa-edit"></i> Edit Safe Zones
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <p>GeoAlert Earthquake Response System &copy; 2025</p>
+            <p>Developed for STEM Competition</p>
+        </footer>
+    </div>
+
+    <audio id="alertSound" src="https://assets.mixkit.co/sfx/preview/mixkit-sci-fi-alarm-990.mp3"></audio>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Initialize map
+        function initMap() {
+            // Kuala Lumpur coordinates
+            const klCoords = [3.1390, 101.6869];
+
+            // Create map
+            const map = L.map('map', {
+                zoomControl: false
+            }).setView(klCoords, 14);
+
+            // Add tile layer (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 18
+            }).addTo(map);
+
+            // Add custom zoom controls
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(map);
+
+            // Add scale control
+            L.control.scale({
+                position: 'bottomleft',
+                imperial: false
+            }).addTo(map);
+
+            // Add safe zones
+            const safeZones = [{
+                    name: "Merdeka Square",
+                    coords: [3.1478, 101.6953]
+                },
+                {
+                    name: "KLCC Park",
+                    coords: [3.1586, 101.7115]
+                },
+                {
+                    name: "KL Hospital Field",
+                    coords: [3.1380, 101.6990]
+                },
+                {
+                    name: "National Stadium",
+                    coords: [3.1521, 101.7333]
+                }
+            ];
+
+            // Custom icon for safe zones
+            const safeZoneIcon = L.divIcon({
+                className: 'custom-icon',
+                html: '<div style="background: #2ecc71; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(46, 204, 113, 0.8);"></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            // Add markers for safe zones
+            safeZones.forEach(zone => {
+                L.marker(zone.coords, {
+                        icon: safeZoneIcon
+                    }).addTo(map)
+                    .bindPopup(`<b>${zone.name}</b><br>Safe Zone`);
+            });
+
+            // Add user marker
+            const userIcon = L.divIcon({
+                className: 'custom-icon',
+                html: '<div style="background: #e74c3c; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(231, 76, 60, 0.8);"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            const userMarker = L.marker(klCoords, {
+                icon: userIcon,
+                draggable: false
+            }).addTo(map).bindPopup('<b>Your Location</b>');
+
+            // Store map instance
+            window.map = map;
+            window.userMarker = userMarker;
+            window.safeZones = safeZones;
+        }
+
+        // Calculate evacuation route
+        function calculateEvacuationRoute() {
+            const map = window.map;
+            const userMarker = window.userMarker;
+            const safeZones = window.safeZones;
+
+            // Clear previous routes
+            if (window.routeLayer) {
+                map.removeLayer(window.routeLayer);
+            }
+
+            // Find nearest safe zone (in a real app, this would use routing API)
+            const userLatLng = userMarker.getLatLng();
+            let nearestZone = safeZones[0];
+            let minDistance = userLatLng.distanceTo(L.latLng(safeZones[0].coords));
+
+            for (let i = 1; i < safeZones.length; i++) {
+                const distance = userLatLng.distanceTo(L.latLng(safeZones[i].coords));
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestZone = safeZones[i];
+                }
+            }
+
+            // Draw evacuation route (simplified)
+            const routePoints = [
+                userLatLng,
+                L.latLng(nearestZone.coords)
+            ];
+
+            // Create a polyline to represent the route
+            const routeLayer = L.polyline(routePoints, {
+                color: '#e74c3c',
+                weight: 6,
+                opacity: 0.8,
+                dashArray: '10, 10',
+                lineCap: 'round'
+            }).addTo(map);
+
+            // Store route layer
+            window.routeLayer = routeLayer;
+
+            // Fit map to show entire route
+            map.fitBounds(routePoints);
+
+            // Update route info
+            document.getElementById('dest-value').textContent = nearestZone.name;
+            document.getElementById('dist-value').textContent = `${(minDistance/1000).toFixed(1)} km`;
+            document.getElementById('time-value').textContent = `${Math.round(minDistance/80)} minutes`; // Walking speed ~5km/h
+            document.getElementById('safety-value').textContent = "High (Avoids bridges)";
+
+            // Show evacuation info
+            document.getElementById('evac-info').style.display = 'block';
+        }
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize map
+            initMap();
+
+            // Navigation
+            const navButtons = document.querySelectorAll('.nav-btn');
+            const screens = document.querySelectorAll('.screen');
+
+            navButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const targetScreen = this.getAttribute('data-screen');
+
+                    // Update active nav button
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Show target screen
+                    screens.forEach(screen => {
+                        screen.classList.remove('active');
+                        if (screen.id === targetScreen) {
+                            screen.classList.add('active');
+                        }
+                    });
+
+                    // Invalidate map size when switching to map screen
+                    if (targetScreen === 'map' && window.map) {
+                        setTimeout(() => {
+                            window.map.invalidateSize();
+                        }, 100);
+                    }
+                });
+            });
+
+            // Test Alert Button
+            const testAlertBtn = document.getElementById('testAlertBtn');
+            const container = document.getElementById('container');
+            const alertSound = document.getElementById('alertSound');
+            const mapOverlay = document.getElementById('map-overlay');
+
+            testAlertBtn.addEventListener('click', function() {
+                // Add earthquake effect
+                container.classList.add('earthquake-active');
+                container.classList.add('vibrate');
+
+                // Play alert sound
+                if (document.getElementById('sound-toggle').checked) {
+                    alertSound.play();
+                }
+
+                // Update dashboard status
+                document.querySelector('.status-message').textContent = "EARTHQUAKE DETECTED!";
+                document.querySelector('.status-message').style.color = "#e74c3c";
+                document.querySelector('.status-submessage').textContent = "Magnitude 6.2 - Seek shelter!";
+                document.querySelector('.earthquake-status').style.background = "rgba(231, 76, 60, 0.2)";
+                document.querySelector('.earthquake-status').style.borderColor = "#e74c3c";
+                document.querySelector('.earthquake-status').style.boxShadow = "0 0 20px rgba(231, 76, 60, 0.3)";
+                document.querySelector('.earthquake-status').classList.remove('safe-pulse');
+                document.querySelector('.earthquake-status').classList.add('pulse-alert');
+
+                // Hide map overlay
+                mapOverlay.style.display = 'none';
+
+                // Calculate and show evacuation route
+                setTimeout(() => {
+                    if (window.map) {
+                        calculateEvacuationRoute();
+                    }
+                }, 1000);
+
+                // Show alert for 10 seconds
+                setTimeout(() => {
+                    container.classList.remove('earthquake-active');
+                    container.classList.remove('vibrate');
+                    alertSound.pause();
+                    alertSound.currentTime = 0;
+                }, 10000);
+            });
+
+            // Simulate sensor connection status changes
+            setInterval(() => {
+                const statusIndicators = document.querySelectorAll('.status-dot');
+
+                // Randomly toggle connection status for demo
+                statusIndicators.forEach(indicator => {
+                    if (Math.random() > 0.9) {
+                        indicator.classList.toggle('connected');
+                    }
+                });
+            }, 5000);
+        });
+    </script>
+</body>
+
+</html>
